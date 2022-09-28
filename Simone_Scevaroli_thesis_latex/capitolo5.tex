@@ -1,0 +1,28 @@
+\chapter{Final considerations and Conclusion}
+\label{cha:500}
+In this chapter I make the point on the aspects that could be developed further and I give some ideas for a continuous research on this.
+
+
+\section{General considerations}
+\label{sec:510}
+In general, during all the testing process, PPO helped the max fitness to reach the solved threshold (in some environment more than others), even if it's not really connected to the evolutionary process, because of the considerations made in Section \ref{sec:330}. This work, for this reason, considered only the max fitness obtained by the best individual as metric and leave out the mean fitness of the population, due to the fact that the mean fitness is not influenced by the optimization via PPO, but it depends only on GE and for which there are already many studies about.
+
+Despite this, PPO could also find a new state-of-the-art policy when the task had already been solved and due to this it was applied also for environment like Acrobot-v1 in which the evolutionary process converges the max fitness very quickly towards the solved threshold.
+
+In addition, the algorithm proposed was a novel approach for which there's a very limited literature and the research is still proceeding, a fact that has stimulated myself to try to contribute, even a bit, to this cause, confirming that this is the right direction to take for AI. This fact has also led to greater difficulty to find parameters for the algorithms (and it is well-known that in AI and RL they greatly affect performance) and emboldened me to carry out a personal search of the parameters themselves, with all the consequences that ensued, such as a lower performance or a longer convergence time (in terms of generations).
+
+Another point where I want to dwell is the environments selected for this work: we considered all the environments in the category "Classic Control" for OpenAIGym, excluding the ones that have a continuous action spaces (i.e. "Pendulum-v1" and "MountainCarContinuous-v0"); the remaining ones, as it was explained in the introduction section of the Chapter \ref{cha:400}, have different kind of reward: MountainCar and Acrobot have a sparse reward and during the testing phase, it was found out that the policies in environments like those could not be optimized correctly with PPO and for this reason, only for CartPole were found good results and PPO has really improved the evolutionary process.
+
+This is an important point which corroborates the considerations made in \cite{ppo_acrobot} and in \cite{ppo_mountaincar} and it has to be considered for future works in this field.
+
+
+Even though the results that I obtained are not overwhelming, I know that a more in-depth study could led to more encouraging performances of the algorithm and this work could be used as a starting point for futures research.
+
+
+\section{Future studies}
+\label{sec:520}
+IAI models are already able to outperform NNs for a lot of tasks as demonstrated in many scientific papers such as \cite{custode} and \cite{silva} and are continuing to improve year after year with novel approaches like the one proposed in this work. This research could not cover every aspect of the approach used and all the approximations and workarounds done during the process deteriorated extremely the final performance of the algorithm. To improve the results, it could be done a deeper search for the hyperparameters used in PPO and also the PPO algorithm itself could be implemented in a more efficient way.
+
+In addition, an implementation of the phenotype-to-genotype mapping function (or other techniques to insert back the optimized individual from PPO into the population) could transfer the benefits obtained from PPO shown in the Chapter \ref{cha:400} to the evolutionary process, making it more stable and lowering the necessary generations to train an agent with a max fitness.
+
+\newpage

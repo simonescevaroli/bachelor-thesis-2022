@@ -1,0 +1,50 @@
+\chapter{Setup PPO and link it with GE}
+\label{cha:300}
+Once the DTs are converted into DDTs, they are ready to be optimized via PPO, but before it's necessary to modify the existing algorithm to accept them. The code for an implementation of basic PPO has been taken from \cite{barhate} written with PyTorch library, in which I did all the modifications needed for the purpose, explained in the next section.
+ 
+ 
+\section{Modifying PPO to accept DDTs}
+\label{sec:310}
+PPO is a policy gradient method that trains a stochastic policy in an on-policy way. Also, it utilizes the Actor Critic method. So PPO works with 2 Neural Networks (NNs), one as the actor, which chooses the action given a state, and the other as the critic, which evaluates the expected reward given a state. The main thing to do was to replace the actor with the DDT passed to the optimizer and then change the forward method of the first NN to the forward method explained in the Section \ref{sec:230}. The critic instead remaining a NN as before.\\
+Next, other modifications was suggested in \cite{silva} and listed below:
+\begin{itemize}
+    \item the optimizer used is RMSprop and the parameters taken are the ones from the critic and the ones from the DDT, which are the split values and the probability tensors of the leaves;
+    \item the activation function for the critic (a NN) is ReLU().
+\end{itemize}
+
+
+
+\section{Tuning the hyperparameters}
+\label{sec:320}
+All the PPO's hyperparameters used were found by a manual tuning, trying to find the best values for each environment. Being several parameters, it would have been difficult to obtain the ones that gain the optimum results for every environment, so for this work I settled on parameters that gave me the security to improve the DDT even if sometimes the algorithm doesn't work as expected.
+
+For this reason the algorithm in general would require a more in-depth study, looking for the best configuration settings with the help of a tool that would reduce the effort to find them, trying a large scale of configurations autonomously.
+
+For the PPO's hyperparameters and also the parameters to configure the environment, see the supplementary material in the appendix.
+
+\section{Connecting PPO with GE}
+\label{sec:330}
+Once the algorithm was ready to be used, I implemented a method that chooses every \textit{n} generations, where \textit{n} varies depending on the environment considered, the best tree or a random tree with $50\%$ probability each.
+
+Some checks to the DTs that need to be chosen were added in order to not waste time trying to optimize a tree that cannot be improved. The checks that I have carried out are the following:
+\begin{itemize}
+    \item Check if the chosen DT already solves the task (see the Chapter \ref{cha:400} for the thresholds for every environment).
+    \item Check if the DT is composed only by 1 leaf, because it's impossible to optimize it.
+    \item Check if the DT has only 1 condition and 2 leaves, because even in the simplest environment (i.e. CartPole-v1) a DT with these characteristics is not able to solve the task.
+\end{itemize}
+
+When at least one of the conditions listed above is met, then another random DT is chosen from the population. There's another final check on the times this procedure can happen and it's equal to the \textit{population size}: in the case that all the individuals in the population solve the task or have a structure that does not allow them to solve it, PPO cannot do anything to improve the evolutionary process and it's necessary to wait for the next generations.
+
+After choosing the DT to be improved, it's converted into a DDT using the technique explained in Chapter \ref{cha:200}, Section \ref{sec:220} and sent to PPO.
+
+When the DDT is returned to the main algorithm, first of all it's discretized back into a DT.
+
+At this point of the implementation, a problem concerning the method to put back the individual into the population came up and it could be solved in two ways.
+
+The first idea was to replace the individual directly in the population, substituting  the worst one; but this would have required a particular function which makes possible the conversion from phenotype to genotype, because the optimization with PPO is done directly on the phenotype of the individuals. This mapping process is really tricky to do, despite the conversion from genotype to phenotype is quite easy (it's the basis for GE), so it was thought to bypass the problem by not putting the individual back in the population. This leads to an obvious consequence: that of not really improving the evolutionary process.
+
+So I decided to focus more on the optimization of the DTs with PPO, comparing them with the un-optimized version, because it might be possible that some particular individuals with a specific genotype that have a low fitness could be transformed into an high-score individuals by small changes directly on the phenotype (using PPO).
+
+Additionally to what I said above, even if the individual optimized is not put back into the population, it's compared with the best DT of the current generation to see if a new best was found thanks to PPO.
+
+\newpage

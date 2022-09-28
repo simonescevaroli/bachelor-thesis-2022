@@ -1,0 +1,80 @@
+\chapter{Setup main algorithm and models}
+\label{cha:200}
+The concept of this work is to evolve DTs using an evolutionary algorithm, in this case Grammatical Evolution, and then, every \textit{n} number of generations, the best or a random tree is chosen from the population with a probability of 50\(\%\) each: in this way I give the same probability to \textit{exploit}, choosing the best tree, and to \textit{explore}, choosing a random tree. Thus the selected tree is converted into a DDT and sent to the PPO algorithm, which seeks to optimize it leaving the structure unchanged. When this optimization part finishes, the DDT is discretized back into a DT and then the new fitness of the individual is calculated on 50 different episodes in the environment. Lastly, the best individual is selected also considering this new optimized policy from PPO and the evolutionary process going on with the next generations.
+
+
+\section{Setup for GE}
+\label{sec:210}
+To evolve individuals during most generations, it has been used Grammatical Evolution. The first generation is composed by random individuals created by a factory which takes directives on how to create them from a \textit{yaml} configuration file. In the configuration file in fact are present some data necessary to initiate GE, listed below:
+\begin{itemize}
+    \item \textit{geno\_len}, which is the maximum length of the genotype strings that make up the individuals
+    \item \textit{pop\_size}, which indicates how many individuals are in the population
+    \item \textit{tournament\_size}, which states for the dimension of the tournament selection operator; tournament selection works as follow: for every offspring to be generated, \textit{k} (\textit{k} is the tournament size) random individuals are picked from the population, then the individual with the highest fitness is chosen and a copy is made
+    \item \textit{gene\_prob}, which is a float number that specifies with what probability a particular gene can mutate applying mutation operator
+    \item \textit{grammar}, which is the most important parameter because with this is created all the individuals respecting the defined constraints (e.g. the dimension of the input state space and the boundaries for values in the condition splits).
+    
+    The grammar is expressed in the form of production rules using the Backus-Naur From (BNF) notation. BNF grammars consist of \textit{terminals}, which are items that can appear in the language, e.g., $+$, $-$, etc., and \textit{nonterminals}, which can be expanded into one or more terminals an nonterminals. A grammar can be represented by the tuple $\{N,T,P,S\}$, where $N$ is the set of nonterminals, $T$ the set of terminals, $P$ a set of production rules that maps the elements of $N$ to $T$, and $S$ is a start symbol that is a member of $N$ \cite{neill}.
+    \item \textit{generations}, which is the number of iterations for the EA
+\end{itemize}
+Afterward the evolutionary process starts and the mutations and crossovers are made depending on a probability value, which for this work were 100\(\%\) and 0\(\%\) respectively. The reason why the crossover probability is set to 0 is because in GE the crossover operator may have destructive impact on the process.
+
+When the new population of changed individuals is obtained, the fitness function values it in order to assign the fitness to every individual.
+
+Then, the replacement takes place, substituting the individuals of the new population (i.e. the offspring) with the individuals of the old population (i.e. the parents) if their fitness is better. This process is repeated for \textit{generations} times where the individuals changed even drastically in the structure and in the features chosen for the splits.
+
+At regular intervals, also PPO is applied to the population. The main idea is that GE helps individuals select the best features for splits and put them in the correct order in the structure of the tree, while PPO works on \textit{split\_values} in the condition nodes and on \textit{actions} in the leaves, trying to maximize the reward in the environment.
+
+
+\section{Converting DTs in DDTs and vice versa}
+\label{sec:220}
+As it was explained in the introduction chapter, PPO cannot be applied to discrete DTs.
+
+First of all, is necessary to convert them into DDTs and for this purpose I followed the method used in \cite{silva}: the Boolean conditions of DTs, shown in Eq. 1, in which \textit{x} and \(\phi\) stand for the selected feature and the split value respectively, are substituted with a sigmoid activation function, shown in Eq. 2, where \(\alpha\) is a steepness parameter which helps to give more weight to one branch rather then the other, making the split less "\textit{soft}", and \(\phi\) is, as before, the split value.
+\[\mu(x) :=
+\begin{cases}
+1,\quad if $\>$ \textit{x} < \phi\\
+0,\quad o/w
+\end{cases}
+\quad(1)
+\]
+\[\mu(x) := \frac{1}{1+e^{-\alpha(x-\phi)}}\qquad\quad(2)\]
+Furthermore, the constant leaves in DTs, which simply contain an integer indicating the mapped action in the environment, are replaced with differentiable leaves, composed of a tensor of dimension equal to the action space dimension and where in each position there is the probability of taking the action mapped with that particular index (e.g. looking at a leaf like this: [0.3, 0.7], it means that there is 30\(\%\) of taking the action 0 and 70\(\%\) of taking the action 1).
+
+The conversion from constant leaf to differentiable leaf works as follow: the action that was previously saved in the constant leaf and the action space dimension are passed as parameters in the \textit{init} function; then a tensor filled with 0.0 is created and exclusively the value in the position corresponding to the passed action is substituted and augmented using the method exposed in the Eq. 3, to give more percentage of choosing that particular action in PPO, leading to greater stability of the algorithm. After this process, the real tensor of probabilities is created through a Gaussian distribution, using the previous tensor as mean and with \(\sigma\) equal to 0.1. Finally, a \textit{Softmax} is applied to the tensor to re-scale the elements so that lie in the range [0,1] and sum to 1.
+
+Both in condition nodes and in leaves it's important to specify the \textit{requires\_grad()} PyTorch function in order to track of operations on tensors with the aim of making backpropagation possible during PPO.
+\[tensor[action] = n\_action-1\qquad\quad(3)\]
+The reverse method is done simply by recreating orthogonal conditions using \textit{input\_features} and \textit{split\_values} from differentiable conditions for the condition nodes and initializing constant leaves with action chosen using an \textit{argmax} on the probability tensor from differentiable leaves for the leaves.
+
+
+\section{Forward method in DDTs}
+\label{sec:230}
+The forward method in DDTs works differently in comparison with the method for DTs, where simply it's necessary to evaluate the Boolean condition for every condition node at each state, choose the correct path and then return the action contained in a leaf.
+
+In a DDT, when the state tensor containing the observation data collected from the environment is given to the tree, every branch of the tree is taken because of the sigmoid activation function, which also determines the weight assigned to every specific branch, and the forward method thus return a weighted averages of the probability tensors in the leaves. For not making that splits \textit{"fuzzy"}, the \(\alpha\) parameter shown in Eq. 2 is set to 1000, a value found heuristically which guarantees that the weights earned by sigmoid activation function are equal to 0 or 1: this way it's as if we just take the correct path by having a discrete DT and the backpropagation only changes the conditions and the leaf that were really needed to determine the output label given an input state. An \(\alpha\) parameter set with a lower value doesn't give the security to have a discrete split with 0/1 weight.
+
+
+\section{Pruning method for DTs}
+\label{sec:240}
+To prune the individuals obtained during the evolutionary process in order to make them even more interpretable, it was used a simplification mechanism taken from \cite{custode}.
+
+First, the policy (e.g. the individual) is executed in a validation environment for 100 episodes, to be sure to try every possible case. Every time a node is visited during this process, a counter (each node has one) is increased. Once this phases is finished, every node that have the counter equal to 0 (those that have not been visited) is removed. Lastly, there's an iteratively search for nodes whose action in the left leaf equals the one in the right leaf: each time a node like this is found, it is replaced with a leaf that contains the action in common to the two leaves. The process finishes when the tree does not contain nodes of this type.
+
+This last mechanism is very useful as PPO often produces trees where nodes have the same actions in the leaves (because it switches actions in leaves).
+
+The simplification process is feasible even by hand in a short time, since the task and the environment are not too complex. For more details on this, see the dedicated Section \ref{sec:prune} in the supplementary material.
+
+
+\section{Metric for interpretability}
+\label{sec:250}
+To measure the complexity of the policies, from the point of view of interpretability, I used the metric first proposed in \cite{metric} and then revised in \cite{custode}, shown in Eq.4.
+\[\mathcal{M}=-0.2+0.2l+0.5n_o+3.4n_{nao}+4.5n_{naoc}\qquad\quad(4)\]
+The parameters that appear in the formula are:
+\begin{itemize}
+    \item $l$, sum of operations, variables and constants
+    \item $n_o$, the number of operations
+    \item $n_{nao}$, the number of non-arithmetical operations
+    \item $n_{naoc}$, the number of consecutive compositions of non-arithmetical operations
+\end{itemize}
+This metric is interpreted as follows: a higher $\mathcal{M}$ for a model means that that model is harder to interpret (e.g. a DT composed only by a constant, which is the best case from the interpretability point of view, has complexity equal to 0).
+\newpage

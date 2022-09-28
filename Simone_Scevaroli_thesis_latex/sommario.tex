@@ -1,0 +1,18 @@
+\chapter*{Abstract} % senza numerazione
+\label{abstract}
+
+\addcontentsline{toc}{chapter}{Abstract} % da aggiungere comunque all'indice
+
+During the last years, neural networks achieved great results in Reinforcement Learning (RL). On the other hand their lack of interpretability led researchers to find an alternative way to obtain efficient models, without sacrificing their ease of understanding by humans. In this field, defined as Interpretable AI (IAI), a sub-branch of Explainable AI (XAI), decision trees (DTs), that are already present in a pervasive way in machine learning due to their ease of use and their, as the matter of fact, interpretability, have become increasingly established.
+
+In this thesis, I propose a method for the evolution of decision trees that leverage optimization techniques created for neural networks (namely backpropagation), combining them with evolutionary algorithms. These trees are then used as models to make an agent in a given state choose the action to be taken; CartPole, Acrobot and MountainCar were the environments considered for this work.\\This work of thesis can be divided in four phases.
+
+First, I wrote methods to transform DTs in Differentiable Decision Trees (DDTs), a necessary step to then be able to apply backpropagation to trees.
+
+Second, I implemented the algorithm that makes the backpropagation, named Proximal Policy Optimization (PPO), converted to accept and evolve DDTs and tuning also its hyperparameters.
+
+Third, I linked this algorithm to the main evolutionary process, named Grammatical Evolution (GE), which is a Genetic Programming technique. Using them together I tried to achieve better results in less time and to stabilize the process too.
+
+Finally, I performed simulations to highlight the advantages and the drawbacks of using these algorithm in combination.
+
+\newpage
